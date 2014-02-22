@@ -208,41 +208,10 @@
 				return true;	//otherwise the line is a statement
 			}
 			
-			/*make sure that parentheses, curly, and square brackets
-			are correctly paired and do not appear in an invalid order*/
-			//this one is less good
-			function checkParenthesesAndBrackets2() {
-				var symbolStack = new Array();	//a stack to store left symbols
-				var currentChar = '';			//character we are currently looking at
-				var stackChar = '';				//character popped from the stack
-				var symbolType = '';			//type of right symbol that is seen
-				
-				for(var i = 0; i < input.length; i++) {
-					currentChar = input.charAt(i);
-					if(currentChar == "(" || currentChar == "{" || currentChar == "[") {
-						symbolStack.push(currentChar);
-					}
-					else if(currentChar == ")" || currentChar == "}" || currentChar == "]") {
-						symbolType = currentChar == ")" ? "parenthese" : ((currentChar == "}") ? "brace" : "square bracket");
-						if(symbolStack.length == 0) {
-							output += "Unexpected right " + symbolType + " detected, check your syntax.\n";
-							return;
-						}
-						else {
-							stackChar = symbolStack.pop();
-							if(!(stackChar == "(" && currentChar == ")") &&
-								!(stackChar == "{" && currentChar == "}") &&
-								!(stackChar == "[" && currentChar == "]")) {
-								output += "Invalid sequence of parentheses, braces, or square brackets detected, check your syntax.\n";
-								return;
-							}
-						}
-					}
-				}
-				if(symbolStack.length > 0) {
-					stackChar = symbolStack.pop();
-					symbolType = stackChar == "(" ? "parenthese" : ((stackChar == "{") ? "brace" : "square bracket");
-					output += "Unclosed " + symbolType + "s detected, check your syntax.\n";
+			function checkForCommonErrors() {
+				var lonePeriod = Math.max(input.indexOf(" ."), input.indexOf(". "));
+				if(lonePeriod >= 0) {
+					output += "A period with adjacent spaces was detected.\n";
 				}
 			}
 		</script>
