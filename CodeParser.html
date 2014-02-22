@@ -1,0 +1,264 @@
+<html>
+	<head>
+		<title>CS 121 Java Parser</title>
+		<script type="text/JavaScript">
+			var input;	//code from the user
+			var output;	//string to store error messages
+			
+			/*check the input code for a variety of errors
+			and report the errors as a concatenated string*/
+			function checkForErrors(code) {
+				input = code;
+				output = "";
+				//check for different types of errors
+				removeCommentsAndStrings();
+				checkParenthesesAndBrackets();
+				checkForSemicolons();
+				checkForCommonErrors();
+				//report whether the code contains errors
+				if(output == "") {
+					output = "No errors detected.";
+				}
+				else {
+					output = "Errors detected:\n" + output;
+				}
+				document.getElementById("errors").value = output;
+			}
+			
+			/*remove all comments and strings from the input
+			and report whether the input leaves any
+			block comments or strings open*/
+			function removeCommentsAndStrings() {
+				var parsedInput = "";			//parsed input with comments and strings removed
+				var inLine = false;				//inside a line comment
+				var inBlock = false;			//inside a block comment
+				var inString = false;			//inside a string
+				var currentQuoteChar = '';		//symbol enclosing the current string, " or '
+				var currentChar = '';			//character we are currently looking at
+				var nextChar = '';				//the next character
+				var commentError = false;		//a */ symbol was seen unexpectedly
+				
+				for(var i = 0; i < input.length; i++) {
+					currentChar = input.charAt(i);
+					nextChar = (i + 1 == input.length) ? '' : input.charAt(i + 1);
+					
+					//open or close a string
+					if(currentChar == '"' || currentChar == "'") {
+						if(inString && currentQuoteChar == currentChar) {
+							inString = false;
+							currentQuoteChar = '';
+							currentChar = '';
+						}
+						else if(!inString && !inLine && !inBlock) {
+							inString = true;
+							currentQuoteChar = currentChar;
+						}
+					}
+					//open or close a line comment
+					else if(currentChar == "/" && nextChar == "/") {
+						if(!inString && !inLine && !inBlock) {
+							inLine = true;
+						}
+					}
+					else if(currentChar == "\n" && inLine) {
+						inLine = false;
+						currentChar = '';
+					}
+					//open or close a block comment and check for unexpected */ symbols
+					else if(currentChar == "/" && nextChar == "*") {
+						if(!inString && !inLine && !inBlock) {
+							inBlock = true;
+						}
+					}
+					else if(currentChar == "*" && nextChar == "/") {
+						if(inBlock) {
+							inBlock = false;
+							currentChar = '';
+							i++;
+						}
+						else if(!inString && !inLine) {
+							commentError = true;
+						}
+					}
+					//ignore symbols when inside comments or strings
+					if(!inLine && !inBlock && !inString) {
+						parsedInput += currentChar;
+					}
+				}
+				//use parsed input for future error checks
+				input = parsedInput;
+				//report detected errors
+				if(commentError) {
+					output += "Unexpected */ symbol detected.\n";
+				}
+				if(inString) {
+					output += "String beginning with " + (currentQuoteChar == "'" ? "single quote" : "double quote") + " left open.\n";
+				}
+				else if(inBlock) {
+					output += "Block comment beginning with /* left open.\n";
+				}
+			}
+			
+			/*make sure that parentheses, braces, and square brackets
+			are correctly paired and do not appear in an invalid order*/
+			function checkParenthesesAndBrackets() {
+				var currentChar = '';			//character we are currently looking at
+				var leftStack = new Array();	//a stack storing (, [, and { symbols
+				var topOfStack = '';			//the symbol that is currently on top of the stack
+				//count variables for parentheses, braces, and square brackets
+				var parenCount = braceCount = squareCount = 0;
+				//error variables become true if the respective error occurs
+				var parenError = braceError = squareError = sequenceError = false;
+				
+				for(var i = 0; i < input.length; i++) {
+					currentChar = input.charAt(i);
+					/*push left symbols onto the stack and increment counts
+					decrement counts when right symbols are seen and check
+					them against the top of the stack for sequence errors*/
+					switch(currentChar) {
+					case "(":
+						parenCount++;
+						leftStack.push(currentChar);
+						break;
+					case "{":
+						braceCount++;
+						leftStack.push(currentChar);
+						break;
+					case "[":
+						squareCount++;
+						leftStack.push(currentChar);
+						break;
+					case ")":
+						parenCount--;
+						topOfStack = leftStack.pop();
+						if(topOfStack != "(" && topOfStack != undefined)	sequenceError = true;
+						break;
+					case "}":
+						braceCount--;
+						topOfStack = leftStack.pop();
+						if(topOfStack != "{" && topOfStack != undefined)	sequenceError = true;
+						break;
+					case "]":
+						squareCount--;
+						topOfStack = leftStack.pop();
+						if(topOfStack != "[" && topOfStack != undefined)	sequenceError = true;
+						break;
+					}
+					//negative counts mean symbols are mismatched
+					if(parenCount < 0)	parenError = true;
+					if(braceCount < 0)	braceError = true;
+					if(squareCount < 0)	squareError = true;
+				}
+				//positive counts at the end mean symbols are mismatched
+				if(parenCount > 0)	parenError = true;
+				if(braceCount > 0)	braceError = true;
+				if(squareCount > 0)	squareError = true;
+				//report detected errors
+				if(sequenceError)
+					output += "Invalid ordering of parentheses, braces, or square brackets detected.\n";
+				if(parenError)
+					output += "Mismatched parentheses detected.\n";
+				if(braceError)
+					output += "Mismatched braces detected.\n";
+				if(squareError)
+					output += "Mismatched square brackets detected.\n";
+			}
+			
+			/*attempt to figure out which lines in the input
+			are statements, and check whether they end in semicolons*/
+			function checkForSemicolons() {
+				var splitInput = input.split("\n");	//split the input into individual lines
+				var currentLine = "";				//line we are currently looking at
+				var errorCount = 0;					//the number of missing semicolon errors
+				
+				for(var i = 0; i < splitInput.length; i++) {
+					/*remove {'s and }'s from each line
+					and trim white space on either end*/
+					currentLine = splitInput[i];
+					currentLine = currentLine.replace(/{/g, "");
+					currentLine = currentLine.replace(/}/g, "");
+					currentLine = currentLine.trim();
+					//if a line is a statement and doesn't end in a semicolon, count it
+					if(isStatement(currentLine) && currentLine.charAt(currentLine.length - 1) != ";") {
+						errorCount++;
+					}
+				}
+				//report error if missing semicolons are detected
+				if(errorCount > 0) {
+					output += "Statement" + (errorCount > 1 ? "s" : "") + " without a semicolon detected.\n";
+				}
+			}
+			
+			/*a helper function that attempts to determine
+			if a line is a statement based on whether
+			it is empty or begins with a keyword*/
+			function isStatement(string) {
+				//list of keywords that indicate a line is not a statement
+				var keywords = ["public", "private", "if", "else", "for", "while", "switch", "case", "try", "catch", "finally"];
+				
+				//if the line begins with a keyword or is empty return false
+				for(var i = 0; i < keywords.length; i++) {
+					if(string.indexOf(keywords[i]) == 0) {
+						return false;
+					}
+				}
+				if(string == "") {
+					return false;
+				}
+				return true;	//otherwise the line is a statement
+			}
+			
+			/*make sure that parentheses, curly, and square brackets
+			are correctly paired and do not appear in an invalid order*/
+			//this one is less good
+			function checkParenthesesAndBrackets2() {
+				var symbolStack = new Array();	//a stack to store left symbols
+				var currentChar = '';			//character we are currently looking at
+				var stackChar = '';				//character popped from the stack
+				var symbolType = '';			//type of right symbol that is seen
+				
+				for(var i = 0; i < input.length; i++) {
+					currentChar = input.charAt(i);
+					if(currentChar == "(" || currentChar == "{" || currentChar == "[") {
+						symbolStack.push(currentChar);
+					}
+					else if(currentChar == ")" || currentChar == "}" || currentChar == "]") {
+						symbolType = currentChar == ")" ? "parenthese" : ((currentChar == "}") ? "brace" : "square bracket");
+						if(symbolStack.length == 0) {
+							output += "Unexpected right " + symbolType + " detected, check your syntax.\n";
+							return;
+						}
+						else {
+							stackChar = symbolStack.pop();
+							if(!(stackChar == "(" && currentChar == ")") &&
+								!(stackChar == "{" && currentChar == "}") &&
+								!(stackChar == "[" && currentChar == "]")) {
+								output += "Invalid sequence of parentheses, braces, or square brackets detected, check your syntax.\n";
+								return;
+							}
+						}
+					}
+				}
+				if(symbolStack.length > 0) {
+					stackChar = symbolStack.pop();
+					symbolType = stackChar == "(" ? "parenthese" : ((stackChar == "{") ? "brace" : "square bracket");
+					output += "Unclosed " + symbolType + "s detected, check your syntax.\n";
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<style type="text/css">
+		</style>
+		<form>
+			<p><b>Code:</b></p>
+			<textarea id="code" cols="100" rows="20"/></textarea>
+			</br>
+			<input type="button" value="Check" onclick="checkForErrors(document.getElementById('code').value)"/>
+			</br>
+			<p><b>Errors:</b></p>
+			<textarea id="errors" cols="100" rows="20"/></textarea>
+			</br>
+		</form>
+	</body>
+</html>
